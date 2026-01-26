@@ -496,6 +496,9 @@ void Canvas::onMonitorChange(std::function<void(int)> f) const {
     pimpl_->onMonitorChange(std::move(f));
 }
 
+void Canvas::onRawEvent(std::function<void(const void *event)> /*f*/) const {
+}
+
 void Canvas::close() {
 
     pimpl_->close();

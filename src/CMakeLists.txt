@@ -691,6 +691,18 @@ if (THREEPP_WITH_WGPU)
     endif ()
 endif ()
 
+if (THREEPP_WITH_SDL3)
+    list(APPEND publicHeaders
+            "threepp/canvas/Canvas.hpp"
+    )
+
+    list(APPEND sources
+            "threepp/canvas/Canvas_SDL3.cpp"
+    )
+
+    message("Using SDL3 for windowing")
+endif ()
+
 if (NOT DEFINED EMSCRIPTEN)
     list(APPEND privateHeaders
             "threepp/utils/LoadGlad.hpp"
@@ -759,7 +771,9 @@ if (NOT DEFINED EMSCRIPTEN)
             "${CMAKE_CURRENT_SOURCE_DIR}/external/glad"
     )
 
-    if (THREEPP_USE_EXTERNAL_GLFW OR BUILD_SHARED_LIBS)
+    if (THREEPP_WITH_SDL3)
+        target_link_libraries(threepp PRIVATE SDL3::SDL3)
+    elseif (THREEPP_USE_EXTERNAL_GLFW OR BUILD_SHARED_LIBS)
         target_link_libraries(threepp PRIVATE glfw)
     else ()
         target_include_directories(threepp PRIVATE BEFORE SYSTEM "external/glfw/include")

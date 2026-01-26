@@ -1,4 +1,8 @@
 cmake_minimum_required(VERSION 3.19)
+# UTF-8 source
+add_compile_options("$<$<AND:$<C_COMPILER_ID:MSVC>,$<COMPILE_LANGUAGE:C,CXX>>:/utf-8>")
+add_compile_options("$<$<AND:$<CXX_COMPILER_ID:MSVC>,$<COMPILE_LANGUAGE:CXX>>:/Zc:__cplusplus>")
+
 project(threepp)
 
 include(CMakeDependentOption)
@@ -20,10 +24,18 @@ cmake_dependent_option(THREEPP_WGPU_GLSL_COMPAT
 
 cmake_dependent_option(THREEPP_WITH_INFERENCE "Build with Inference support" OFF "THREEPP_WITH_WGPU OR THREEPP_WITH_VULKAN" OFF)
 
-# Force THREEPP_WITH_GLFW ON when targeting Emscripten
-cmake_dependent_option(THREEPP_WITH_GLFW "Build with GLFW frontend" ON "NOT DEFINED EMSCRIPTEN" ON)
+# Window backend options - choose one: GLFW or SDL3
+option(THREEPP_WITH_SDL3 "Build with SDL3 frontend" OFF)
+
+# Force THREEPP_WITH_GLFW ON when targeting Emscripten (if SDL3 not selected)
+cmake_dependent_option(THREEPP_WITH_GLFW "Build with GLFW frontend" ON "NOT DEFINED EMSCRIPTEN;NOT THREEPP_WITH_SDL3" OFF)
 # Force THREEPP_USE_EXTERNAL_GLFW OFF if NOT THREEPP_WITH_GLFW
-cmake_dependent_option(THREEPP_USE_EXTERNAL_GLFW "Use externally supplied GLFW" OFF "THREEPP_WITH_GLFW" OFF)
+cmake_dependent_option(THREEPP_USE_EXTERNAL_GLFW "Use externally supplied GLFW" OFF "THREEPP_WITH_GLFW;NOT THREEPP_WITH_SDL3" OFF)
+
+# Validation: cannot enable both GLFW and SDL3
+if (THREEPP_WITH_GLFW AND THREEPP_WITH_SDL3)
+    message(FATAL_ERROR "Cannot enable both THREEPP_WITH_GLFW and THREEPP_WITH_SDL3. Please choose one.")
+endif()
 
 cmake_dependent_option(THREEPP_BUILD_EXAMPLE_PROJECTS "Build example projects" ON "THREEPP_BUILD_EXAMPLES" OFF)
 cmake_dependent_option(THREEPP_FETCH_ASSIMP "Make assimp available for examples" OFF "THREEPP_BUILD_EXAMPLES" OFF)
@@ -53,7 +65,9 @@ if (DEFINED EMSCRIPTEN)
     endif ()
 else ()
 
-    if (THREEPP_USE_EXTERNAL_GLFW)
+    if (THREEPP_WITH_SDL3)
+        find_package(SDL3 CONFIG REQUIRED)
+    elseif (THREEPP_USE_EXTERNAL_GLFW)
         find_package(glfw3 CONFIG REQUIRED)
     endif ()
 

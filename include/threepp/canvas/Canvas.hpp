@@ -55,6 +55,8 @@ namespace threepp {
 
         void onMonitorChange(std::function<void(int)> f) const;
 
+        void onRawEvent(std::function<void(const void *event)> f) const;
+
         void animate(const std::function<void()>& f);
 
         // returns false if application should quit, true otherwise
