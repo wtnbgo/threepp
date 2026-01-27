@@ -259,6 +259,7 @@ struct Canvas::Impl {
             glfwMakeContextCurrent(window);
 
 #ifndef __EMSCRIPTEN__
+            initGlad(reinterpret_cast<GLADloadproc>(glfwGetProcAddress));
             loadGlad();
             glfwSwapInterval(params_.vsync_ ? 1 : 0);
 

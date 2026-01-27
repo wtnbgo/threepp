@@ -214,6 +214,7 @@ struct Canvas::Impl {
         SDL_GL_MakeCurrent(window, glContext);
 
         setWindowIcon(window, params.favicon_);
+        initGlad(reinterpret_cast<GLADloadproc>(SDL_GL_GetProcAddress));
         loadGlad();
         SDL_GL_SetSwapInterval(params.vsync_ ? 1 : 0);
 
