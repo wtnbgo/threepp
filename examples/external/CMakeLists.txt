@@ -11,7 +11,13 @@ set(IMGUI_COMMON_SOURCES
         "imgui/imgui_widgets.cpp"
 )
 
-if (THREEPP_WITH_SDL3)
+if (THREEPP_WITH_GENERIC)
+    # Generic backend - no platform-specific imgui backend
+    target_sources(imgui PRIVATE
+            ${IMGUI_COMMON_SOURCES}
+    )
+    target_compile_definitions(imgui PUBLIC THREEPP_IMGUI_GENERIC=1)
+elseif (THREEPP_WITH_SDL3)
     # SDL3 backend
     target_sources(imgui PRIVATE
             ${IMGUI_COMMON_SOURCES}

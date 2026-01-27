@@ -24,18 +24,30 @@ cmake_dependent_option(THREEPP_WGPU_GLSL_COMPAT
 
 cmake_dependent_option(THREEPP_WITH_INFERENCE "Build with Inference support" OFF "THREEPP_WITH_WGPU OR THREEPP_WITH_VULKAN" OFF)
 
-# Window backend options - choose one: GLFW or SDL3
+# Window backend options - choose one: GLFW, SDL3 or Generic
 option(THREEPP_WITH_SDL3 "Build with SDL3 frontend" OFF)
+option(THREEPP_WITH_GENERIC "Build with Generic frontend (user-provided interface)" OFF)
 
-# Force THREEPP_WITH_GLFW ON when targeting Emscripten (if SDL3 not selected)
-cmake_dependent_option(THREEPP_WITH_GLFW "Build with GLFW frontend" ON "NOT DEFINED EMSCRIPTEN;NOT THREEPP_WITH_SDL3" OFF)
+# Force THREEPP_WITH_GLFW ON when targeting Emscripten (if SDL3/Generic not selected)
+cmake_dependent_option(THREEPP_WITH_GLFW "Build with GLFW frontend" ON "NOT DEFINED EMSCRIPTEN;NOT THREEPP_WITH_SDL3;NOT THREEPP_WITH_GENERIC" OFF)
 # Force THREEPP_USE_EXTERNAL_GLFW OFF if NOT THREEPP_WITH_GLFW
-cmake_dependent_option(THREEPP_USE_EXTERNAL_GLFW "Use externally supplied GLFW" OFF "THREEPP_WITH_GLFW;NOT THREEPP_WITH_SDL3" OFF)
+cmake_dependent_option(THREEPP_USE_EXTERNAL_GLFW "Use externally supplied GLFW" OFF "THREEPP_WITH_GLFW;NOT THREEPP_WITH_SDL3;NOT THREEPP_WITH_GENERIC" OFF)
 
-# Validation: cannot enable both GLFW and SDL3
-if (THREEPP_WITH_GLFW AND THREEPP_WITH_SDL3)
-    message(FATAL_ERROR "Cannot enable both THREEPP_WITH_GLFW and THREEPP_WITH_SDL3. Please choose one.")
+# Validation: cannot enable multiple window backends
+set(_WINDOW_BACKEND_COUNT 0)
+if (THREEPP_WITH_GLFW)
+    math(EXPR _WINDOW_BACKEND_COUNT "${_WINDOW_BACKEND_COUNT} + 1")
 endif()
+if (THREEPP_WITH_SDL3)
+    math(EXPR _WINDOW_BACKEND_COUNT "${_WINDOW_BACKEND_COUNT} + 1")
+endif()
+if (THREEPP_WITH_GENERIC)
+    math(EXPR _WINDOW_BACKEND_COUNT "${_WINDOW_BACKEND_COUNT} + 1")
+endif()
+if (_WINDOW_BACKEND_COUNT GREATER 1)
+    message(FATAL_ERROR "Cannot enable multiple window backends. Please choose only one of: THREEPP_WITH_GLFW, THREEPP_WITH_SDL3, THREEPP_WITH_GENERIC.")
+endif()
+unset(_WINDOW_BACKEND_COUNT)
 
 cmake_dependent_option(THREEPP_BUILD_EXAMPLE_PROJECTS "Build example projects" ON "THREEPP_BUILD_EXAMPLES" OFF)
 cmake_dependent_option(THREEPP_FETCH_ASSIMP "Make assimp available for examples" OFF "THREEPP_BUILD_EXAMPLES" OFF)

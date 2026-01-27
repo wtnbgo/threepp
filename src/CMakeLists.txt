@@ -703,6 +703,19 @@ if (THREEPP_WITH_SDL3)
     message("Using SDL3 for windowing")
 endif ()
 
+if (THREEPP_WITH_GENERIC)
+    list(APPEND publicHeaders
+            "threepp/canvas/Canvas.hpp"
+            "threepp/canvas/Generic.hpp"
+    )
+
+    list(APPEND sources
+            "threepp/canvas/Canvas_generic.cpp"
+    )
+
+    message("Using Generic interface for windowing")
+endif ()
+
 if (NOT DEFINED EMSCRIPTEN)
     list(APPEND privateHeaders
             "threepp/utils/LoadGlad.hpp"
@@ -773,6 +786,9 @@ if (NOT DEFINED EMSCRIPTEN)
 
     if (THREEPP_WITH_SDL3)
         target_link_libraries(threepp PRIVATE SDL3::SDL3)
+    elseif (THREEPP_WITH_GENERIC)
+        # Generic backend does not require additional libraries
+        # User must provide their own window system implementation
     elseif (THREEPP_USE_EXTERNAL_GLFW OR BUILD_SHARED_LIBS)
         target_link_libraries(threepp PRIVATE glfw)
     else ()
