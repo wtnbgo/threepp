@@ -1466,6 +1466,17 @@ GLRenderer::GLRenderer(Canvas& canvas, const Parameters& parameters) {
     pimpl_ = std::make_unique<Impl>(*this, canvas.size(), parameters);
 }
 
+// Headless / size-only constructor (fork addition). Assumes an OpenGL context
+// is already current; does not create a window. See GLRenderer.hpp.
+GLRenderer::GLRenderer(std::pair<int, int> size, const Parameters& parameters) {
+
+#ifndef __EMSCRIPTEN__
+    loadGlad();// if Glad has yet to be loaded, do it now
+#endif
+
+    pimpl_ = std::make_unique<Impl>(*this, size, parameters);
+}
+
 
 const gl::GLInfo& GLRenderer::info() {
 

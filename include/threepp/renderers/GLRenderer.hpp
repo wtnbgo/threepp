@@ -36,6 +36,13 @@ namespace threepp {
         /// constructor when using Canvas, as it handles lazy window init.
         explicit GLRenderer(Canvas& canvas, const Parameters& parameters = {});
 
+        /// Headless / size-only constructor (fork addition): does NOT create or
+        /// initialise a window — it assumes an OpenGL context is already current
+        /// (e.g. provided by the host application, as with the Kirikiri plugin).
+        /// Restores the pre-2026 threepp API that upstream replaced with the
+        /// Canvas-aware constructor above.
+        explicit GLRenderer(std::pair<int, int> size, const Parameters& parameters = {});
+
         GLRenderer(GLRenderer&&) = delete;
         GLRenderer(const GLRenderer&) = delete;
         GLRenderer& operator=(const GLRenderer&) = delete;

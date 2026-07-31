@@ -27,11 +27,11 @@ namespace {
         }
         if (favicon) {
             SDL_Surface* surface = SDL_CreateSurfaceFrom(
-                static_cast<int>(favicon->width),
-                static_cast<int>(favicon->height),
+                static_cast<int>(favicon->width()),
+                static_cast<int>(favicon->height()),
                 SDL_PIXELFORMAT_RGBA32,
                 favicon->data().data(),
-                static_cast<int>(favicon->width * 4)
+                static_cast<int>(favicon->width() * 4)
             );
             if (surface) {
                 SDL_SetWindowIcon(window, surface);

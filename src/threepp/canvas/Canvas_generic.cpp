@@ -30,8 +30,8 @@ namespace {
         }
         if (favicon) {
             wsi.setWindowIcon(window, favicon->data().data(),
-                static_cast<int>(favicon->width),
-                static_cast<int>(favicon->height));
+                static_cast<int>(favicon->width()),
+                static_cast<int>(favicon->height()));
         }
     }
 
@@ -360,6 +360,14 @@ void Canvas::close() {
 
 void* Canvas::windowPtr() const {
     return pimpl_->window;
+}
+
+void Canvas::initWindow(GraphicsAPI) {
+    // The Generic backend creates the window and makes the GL context current
+    // eagerly in Impl's constructor, so there is nothing to do here. This
+    // definition exists to satisfy the Canvas-aware GLRenderer constructor
+    // (upstream API); the Kirikiri plugin uses the headless GLRenderer(size)
+    // constructor instead.
 }
 
 Canvas::~Canvas() = default;
