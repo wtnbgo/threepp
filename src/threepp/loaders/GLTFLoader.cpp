@@ -167,6 +167,11 @@ namespace threepp {
             std::unordered_map<int, std::shared_ptr<Skeleton>> skinCache;
             std::unordered_set<int> builtNodes;
 
+            // Extension-layer exposure (VRM etc.): raw JSON text + (mesh,prim)->Mesh.
+            // Copied into GLTFResult by populateAssociations() before the parser is destroyed.
+            std::string rawJsonText;
+            std::map<std::pair<int, int>, std::shared_ptr<Mesh>> meshPrimitives;
+
             // Non-joint mesh nodes whose pre-created Group wrapper has been
             // replaced with the actual meshObj (Mesh or multi-prim Group) —
             // avoids attaching the mesh twice in buildNode.
@@ -239,43 +244,87 @@ namespace threepp {
             }
 
             // Read accessor into flat float vector
+            // Decode one component (at src, of componentType ct) to a normalised float.
+            static float decodeFloatComp(const uint8_t* src, int ct) {
+                switch (ct) {
+                    case COMP_FLOAT: {
+                        float tmp;
+                        std::memcpy(&tmp, src, 4);
+                        return tmp;
+                    }
+                    case COMP_UNSIGNED_BYTE:
+                        return *src / 255.f;
+                    case COMP_UNSIGNED_SHORT: {
+                        uint16_t tmp;
+                        std::memcpy(&tmp, src, 2);
+                        return tmp / 65535.f;
+                    }
+                    case COMP_SHORT: {
+                        int16_t tmp;
+                        std::memcpy(&tmp, src, 2);
+                        return std::max(-1.f, tmp / 32767.f);
+                    }
+                    default:
+                        return 0.f;
+                }
+            }
+
             std::vector<float> readFloats(int accessorIdx) {
-                auto [ptr, stride, count, ct, nc] = getAccessor(accessorIdx);
-                std::vector<float> out;
-                out.reserve(count * nc);
-                for (size_t i = 0; i < count; ++i) {
-                    const uint8_t* row = ptr + i * stride;
-                    for (int j = 0; j < nc; ++j) {
-                        const uint8_t* src = row + j * componentSize(ct);
-                        float val = 0.f;
-                        switch (ct) {
-                            case COMP_FLOAT: {
-                                float tmp;
-                                std::memcpy(&tmp, src, 4);
-                                val = tmp;
-                                break;
-                            }
-                            case COMP_UNSIGNED_BYTE:
-                                val = *src / 255.f;
-                                break;
-                            case COMP_UNSIGNED_SHORT: {
-                                uint16_t tmp;
-                                std::memcpy(&tmp, src, 2);
-                                val = tmp / 65535.f;
-                                break;
-                            }
-                            case COMP_SHORT: {
-                                int16_t tmp;
-                                std::memcpy(&tmp, src, 2);
-                                val = std::max(-1.f, tmp / 32767.f);
-                                break;
-                            }
-                            default:
-                                break;
-                        }
-                        out.push_back(val);
+                const auto& acc = gltf["accessors"][accessorIdx];
+                const int nc = typeCount(acc["type"].get<std::string>());
+                const size_t count = acc["count"].get<size_t>();
+                const int ct = acc["componentType"].get<int>();
+
+                std::vector<float> out(count * static_cast<size_t>(nc), 0.f);
+
+                // Base data from bufferView. Optional: a fully-sparse accessor
+                // (common for VRM morph targets) has no bufferView, base = all zero.
+                if (acc.contains("bufferView")) {
+                    auto [ptr, stride, cnt, bct, bnc] = getAccessor(accessorIdx);
+                    for (size_t i = 0; i < cnt; ++i) {
+                        const uint8_t* row = ptr + i * stride;
+                        for (int j = 0; j < bnc; ++j)
+                            out[i * bnc + j] = decodeFloatComp(row + j * componentSize(bct), bct);
                     }
                 }
+
+                // Sparse overrides (glTF 2.0 sparse accessors).
+                if (acc.contains("sparse")) {
+                    const auto& sp = acc["sparse"];
+                    const size_t spCount = sp["count"].get<size_t>();
+
+                    const auto& idxDef = sp["indices"];
+                    const auto& idxBv = gltf["bufferViews"][idxDef["bufferView"].get<int>()];
+                    const auto& idxBuf = resolveBuffer(idxBv["buffer"].get<int>());
+                    const uint8_t* idxBase = idxBuf.data()
+                            + idxBv.value("byteOffset", static_cast<size_t>(0))
+                            + idxDef.value("byteOffset", static_cast<size_t>(0));
+                    const int idxCt = idxDef["componentType"].get<int>();
+
+                    const auto& valDef = sp["values"];
+                    const auto& valBv = gltf["bufferViews"][valDef["bufferView"].get<int>()];
+                    const auto& valBuf = resolveBuffer(valBv["buffer"].get<int>());
+                    const uint8_t* valBase = valBuf.data()
+                            + valBv.value("byteOffset", static_cast<size_t>(0))
+                            + valDef.value("byteOffset", static_cast<size_t>(0));
+
+                    for (size_t k = 0; k < spCount; ++k) {
+                        size_t idx = 0;
+                        const uint8_t* isrc = idxBase + k * componentSize(idxCt);
+                        switch (idxCt) {
+                            case COMP_UNSIGNED_BYTE: idx = *isrc; break;
+                            case COMP_UNSIGNED_SHORT: { uint16_t t; std::memcpy(&t, isrc, 2); idx = t; break; }
+                            case COMP_UNSIGNED_INT: { uint32_t t; std::memcpy(&t, isrc, 4); idx = t; break; }
+                            default: break;
+                        }
+                        for (int j = 0; j < nc; ++j) {
+                            const uint8_t* vsrc = valBase + (k * nc + j) * componentSize(ct);
+                            const size_t dst = idx * nc + j;
+                            if (dst < out.size()) out[dst] = decodeFloatComp(vsrc, ct);
+                        }
+                    }
+                }
+
                 return out;
             }
 
@@ -899,6 +948,10 @@ namespace threepp {
                     mesh->userData["__gltfMeshIdx"] = meshIdx;
                     mesh->userData["__gltfPrimIdx"] = primIdx;
 
+                    // Extension-layer association (survives variant resolution,
+                    // which erases the userData tags above).
+                    meshPrimitives[{meshIdx, primIdx}] = mesh;
+
                     // Collect per-primitive variant mappings
                     if (!variantNames.empty() &&
                         prim.contains("extensions") &&
@@ -1224,7 +1277,19 @@ namespace threepp {
             //  Entry points
             // -----------------------------------------------------------------------
 
+            // Copy raw JSON + index->object associations into the result before the
+            // parser (a local in load()) is destroyed. shared_ptr map copies are cheap.
+            void populateAssociations(GLTFResult& result) {
+                result.json = rawJsonText;
+                result.nodes = nodeObjects;
+                result.materials = materialCache;
+                result.textures = textureCache;
+                result.skins = skinCache;
+                result.meshPrimitives = meshPrimitives;
+            }
+
             GLTFResult parseGLTF(const std::string& jsonText) {
+                rawJsonText = jsonText;
                 gltf = json::parse(jsonText);
 
                 // Pre-allocate buffer slots
@@ -1264,6 +1329,7 @@ namespace threepp {
                     if (proxy && result.scene) result.scene->add(proxy);
                 }
                 resolveVariants(result);
+                populateAssociations(result);
                 return result;
             }
 
@@ -1302,6 +1368,7 @@ namespace threepp {
 
                 if (!gotJSON) throw std::runtime_error("GLB has no JSON chunk");
 
+                rawJsonText = jsonText;
                 gltf = json::parse(jsonText);
                 int numBuffers = gltf.contains("buffers") ? static_cast<int>(gltf["buffers"].size()) : 0;
                 if (static_cast<int>(buffers.size()) < numBuffers) buffers.resize(numBuffers);
@@ -1339,6 +1406,7 @@ namespace threepp {
                     if (proxy && result.scene) result.scene->add(proxy);
                 }
                 resolveVariants(result);
+                populateAssociations(result);
                 return result;
             }
 
@@ -1593,6 +1661,12 @@ namespace threepp {
             parser.basePath = path.parent_path();
             parser.buffers = {};
 
+            // Detect GLB by magic ("glTF") rather than by extension, so binary
+            // containers with non-standard extensions (e.g. .vrm) load correctly.
+            if (data.size() >= 4 && data[0] == 'g' && data[1] == 'l' && data[2] == 'T' && data[3] == 'F') {
+                return parser.parseGLB(data);
+            }
+
             std::string ext = path.extension().string();
             // lowercase extension
             for (auto& c : ext) c = static_cast<char>(std::tolower(c));
@@ -1601,7 +1675,7 @@ namespace threepp {
                 return parser.parseGLB(data);
             }
 
-            // .gltf — plain JSON
+            // plain JSON (.gltf)
             std::string jsonText(data.begin(), data.end());
             return parser.parseGLTF(jsonText);
         } catch (const std::exception& e) {
