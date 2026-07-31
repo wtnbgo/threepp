@@ -1277,6 +1277,34 @@ namespace threepp {
             //  Entry points
             // -----------------------------------------------------------------------
 
+            // Decode animation channels keyed by target node index (extension layers
+            // like VRM animation retarget by node, which the standard AnimationClips
+            // do not expose). Uses the same accessor decode as the clips.
+            void loadRawAnimations(GLTFResult& result) {
+                if (!gltf.contains("animations")) return;
+                for (const auto& anim : gltf["animations"]) {
+                    if (!anim.contains("channels") || !anim.contains("samplers")) continue;
+                    GLTFRawAnimation ra;
+                    ra.name = anim.value("name", std::string());
+                    const auto& samplers = anim["samplers"];
+                    for (const auto& ch : anim["channels"]) {
+                        if (!ch.contains("target") || !ch.contains("sampler")) continue;
+                        const auto& target = ch["target"];
+                        if (!target.contains("node")) continue;
+                        const auto& sampler = samplers[ch["sampler"].get<int>()];
+                        if (!sampler.contains("input") || !sampler.contains("output")) continue;
+                        GLTFRawChannel rc;
+                        rc.node = target["node"].get<int>();
+                        rc.path = target.value("path", std::string());
+                        rc.interpolation = sampler.value("interpolation", std::string("LINEAR"));
+                        rc.times = readFloats(sampler["input"].get<int>());
+                        rc.values = readFloats(sampler["output"].get<int>());
+                        ra.channels.push_back(std::move(rc));
+                    }
+                    result.rawAnimations.push_back(std::move(ra));
+                }
+            }
+
             // Copy raw JSON + index->object associations into the result before the
             // parser (a local in load()) is destroyed. shared_ptr map copies are cheap.
             void populateAssociations(GLTFResult& result) {
@@ -1286,6 +1314,7 @@ namespace threepp {
                 result.textures = textureCache;
                 result.skins = skinCache;
                 result.meshPrimitives = meshPrimitives;
+                loadRawAnimations(result);
             }
 
             GLTFResult parseGLTF(const std::string& jsonText) {

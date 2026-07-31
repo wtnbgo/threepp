@@ -17,6 +17,21 @@ namespace threepp {
 
     class Skeleton;// only held as shared_ptr in GLTFResult; not pulled in by threepp.hpp
 
+    // Raw (decoded) glTF animation channels for extension layers that need to
+    // retarget by glTF node index (e.g. VRM animation). Times/values are decoded
+    // exactly like the standard AnimationClips, but keyed by target node index.
+    struct GLTFRawChannel {
+        int node = -1;             ///< target node index
+        std::string path;          ///< "translation" | "rotation" | "scale" | "weights"
+        std::string interpolation; ///< "LINEAR" | "STEP" | "CUBICSPLINE"
+        std::vector<float> times;  ///< keyframe times (sec)
+        std::vector<float> values; ///< flat values (rotation: xyzw*4, translation/scale: xyz*3)
+    };
+    struct GLTFRawAnimation {
+        std::string name;
+        std::vector<GLTFRawChannel> channels;
+    };
+
     struct GLTFResult {
         std::shared_ptr<Group> scene;                          ///< Root node of the loaded model
         std::vector<std::shared_ptr<Group>> scenes;            ///< All scenes in the file
@@ -38,6 +53,7 @@ namespace threepp {
         std::unordered_map<int, std::shared_ptr<Texture>> textures;   ///< texture index -> Texture
         std::unordered_map<int, std::shared_ptr<Skeleton>> skins;     ///< skin index -> Skeleton
         std::map<std::pair<int, int>, std::shared_ptr<Mesh>> meshPrimitives; ///< (mesh index, primitive index) -> Mesh
+        std::vector<GLTFRawAnimation> rawAnimations;                         ///< decoded animation channels keyed by node index
     };
 
     class GLTFLoader {
