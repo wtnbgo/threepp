@@ -1775,6 +1775,10 @@ void GLRenderer::beginFrame(int width, int height) {
     glBindFramebuffer(GL_FRAMEBUFFER, p._msaaFbo);
     p._defaultFramebuffer = p._msaaFbo;// render() は画面ターゲット時ここへ描く
     p._msaaActive = true;
+    // 注: alpha-to-coverage(GL_SAMPLE_ALPHA_TO_COVERAGE) は cutout マテリアルの縁を
+    // 平滑化できるが、alpha-blend(半透明)マテリアルに掛けるとディザになるため、
+    // 有効化するなら不透明/cutout パスに限定する必要がある(threepp の per-material 制御が要る)。
+    // 現状は MSAA + 読み戻し un-premultiply のみとする。
 }
 
 void GLRenderer::endFrame() {
