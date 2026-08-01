@@ -667,8 +667,11 @@ GLProgram::GLProgram(const GLRenderer* renderer, std::string cacheKey, const Pro
     vertexShader = unrollLoops(vertexShader);
     fragmentShader = unrollLoops(fragmentShader);
 
+    // ネイティブ desktop GL は "330 core"、GLES/WebGL2 は "300 es"。
+    // ANGLE GLES3 上 (THREEPP_GLES) で "330 core" を出すとシェーダが
+    // コンパイルできず、クリアは映るがジオメトリが一切描画されない。
     std::string glslVersion{"330 core"};
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) || defined(THREEPP_GLES)
     glslVersion = "300 es";
 #endif
 

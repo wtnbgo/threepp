@@ -103,6 +103,10 @@ struct GLRenderer::Impl {
     RenderTarget* _currentRenderTarget = nullptr;
     std::optional<unsigned int> _currentMaterialId;
 
+    // 画面ターゲット時に bind するデフォルト FBO (既定 0=ウィンドウ)。
+    // ホスト提供の中間 FBO 上へ描く構成ではその ID を設定する。
+    unsigned int _defaultFramebuffer = 0;
+
     Camera* _currentCamera = nullptr;
     Vector4 _currentViewport;
     Vector4 _currentScissor;
@@ -237,6 +241,15 @@ struct GLRenderer::Impl {
     }
 
     void render(Object3D* scene, Camera* camera) {
+
+        // 画面ターゲット (renderTarget=nullptr) 時は明示的にデフォルト FBO を bind する。
+        // render() は従来 framebuffer 結合を setRenderTarget 任せにしており、直前に
+        // resetState() やホストが別 FBO を bind していると描画先がずれる。ホストが中間
+        // FBO へ捕捉する構成 (吉里吉里 GLESAdaptor 等) ではここで _defaultFramebuffer を
+        // bind し直すことで、その FBO へ確実に描く。
+        if (!_currentRenderTarget) {
+            state.bindFramebuffer(GL_FRAMEBUFFER, _defaultFramebuffer);
+        }
 
         // update scene graph
 
@@ -1214,7 +1227,7 @@ struct GLRenderer::Impl {
             textures.setupRenderTarget(renderTarget);
         }
 
-        unsigned int framebuffer = 0;
+        unsigned int framebuffer = _defaultFramebuffer;
 
         if (renderTarget) {
 
@@ -1674,6 +1687,23 @@ void GLRenderer::setDepthMask(bool flag) {
 void GLRenderer::resetState() {
 
     pimpl_->reset();
+}
+
+void GLRenderer::setDefaultFramebuffer(unsigned int framebuffer) {
+
+    pimpl_->_defaultFramebuffer = framebuffer;
+}
+
+unsigned int GLRenderer::getDefaultFramebuffer() const {
+
+    return pimpl_->_defaultFramebuffer;
+}
+
+void GLRenderer::setDefaultFramebufferToCurrent() {
+
+    GLint fb = 0;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fb);
+    pimpl_->_defaultFramebuffer = static_cast<unsigned int>(fb);
 }
 
 const gl::GLInfo& GLRenderer::info() const {

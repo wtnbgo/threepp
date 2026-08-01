@@ -141,6 +141,16 @@ namespace threepp {
 
         void resetState();
 
+        // 画面ターゲット (renderTarget=nullptr) 描画時に bind するフレームバッファ ID。
+        // 既定は 0 (ウィンドウのデフォルト FBO)。ホストが中間 FBO を提供して読み戻す
+        // 構成 (例: 吉里吉里 GLESAdaptor.capture) では、その FBO の ID を設定することで
+        // threepp の描画をホストの捕捉先 FBO へ向けられる。
+        void setDefaultFramebuffer(unsigned int framebuffer);
+        [[nodiscard]] unsigned int getDefaultFramebuffer() const;
+        // 現在 GL に bind されている FBO をデフォルトフレームバッファとして取り込む。
+        // ホストが capture 用 FBO を bind した状態で呼ぶ (例: onBeginScene の先頭)。
+        void setDefaultFramebufferToCurrent();
+
         [[nodiscard]] const gl::GLInfo& info() const;
 
         void writeFramebuffer(const std::filesystem::path& filename) override;
