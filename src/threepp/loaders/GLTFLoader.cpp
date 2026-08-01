@@ -1308,6 +1308,17 @@ namespace threepp {
             // Copy raw JSON + index->object associations into the result before the
             // parser (a local in load()) is destroyed. shared_ptr map copies are cheap.
             void populateAssociations(GLTFResult& result) {
+                // VRM 等では matcap(_SphereAdd) 等のテクスチャが glTF material から参照されず、
+                // lazy ロードだと result.textures に載らない。全テクスチャを eager にロードして
+                // index 参照(VRM materialProperties)からも解決できるようにする。
+                // (参照済みは正しい colorSpace でキャッシュ済みなので no-op、未参照分のみ sRGB)
+                if (gltf.contains("textures")) {
+                    for (int i = 0; i < static_cast<int>(gltf["textures"].size()); ++i) {
+                        try {
+                            loadTexture(i);
+                        } catch (...) {}
+                    }
+                }
                 result.json = rawJsonText;
                 result.nodes = nodeObjects;
                 result.materials = materialCache;
