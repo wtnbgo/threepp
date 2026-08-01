@@ -28,6 +28,7 @@ namespace threepp {
                             public MaterialWithDisplacementMap,
                             public MaterialWithEmissive,
                             public MaterialWithWireframe,
+                            public MaterialWithMorphTargets,
                             public MaterialWithDefines {
 
     public:
