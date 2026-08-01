@@ -1330,8 +1330,8 @@ struct GLRenderer::Impl {
         const auto newSize = static_cast<size_t>(image.width()) * image.height() * channels;
         data.resize(newSize);
 
-#ifdef __EMSCRIPTEN__
-        // WebGL lacks glGetTexImage; use a temporary FBO and glReadPixels instead.
+#if defined(__EMSCRIPTEN__) || defined(THREEPP_GLES)
+        // WebGL/GLES lacks glGetTexImage; use a temporary FBO and glReadPixels instead.
         // glReadPixels in WebGL only reliably supports GL_RGBA/GL_UNSIGNED_BYTE.
         const auto texId = textures.getGlTexture(texture);
         if (!texId) {

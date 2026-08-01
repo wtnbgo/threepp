@@ -96,11 +96,15 @@ struct Canvas::Impl {
             wsi.setVSync(window, params.vsync_);
         }
 
+#ifndef THREEPP_GLES
+        // GLES では MSAA は FBO のサンプル数で決まり glEnable(GL_MULTISAMPLE) は無い。
+        // 点サイズも gl_PointSize (シェーダ) で常時有効なので GL_PROGRAM_POINT_SIZE 不要。
         if (params.antialiasing_ > 0) {
             glEnable(GL_MULTISAMPLE);
         }
 
         glEnable(GL_PROGRAM_POINT_SIZE);
+#endif
     }
 
     [[nodiscard]] const WindowSize& getSize() const {

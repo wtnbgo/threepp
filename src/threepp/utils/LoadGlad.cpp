@@ -5,11 +5,13 @@
 #include <iostream>
 
 namespace {
-    GLADloadproc g_gladLoadProc = nullptr;
+    // ホスト(ANGLE)から受け取る getProcAddress。void*(*)(const char*) で保持し、
+    // glad2 の gladLoadGLES2 へ渡すときに GLADloadfunc へキャストする。
+    void *(*g_loader)(const char *) = nullptr;
 }
 
-void threepp::initGlad(GLADloadproc procAddress) {
-    g_gladLoadProc = procAddress;
+void threepp::initGlad(void *(*procAddress)(const char *)) {
+    g_loader = procAddress;
 }
 
 void threepp::loadGlad() {
@@ -17,15 +19,13 @@ void threepp::loadGlad() {
     static bool gladInitialized = false;
 
     if (!gladInitialized) {
-        int result;
-        if (g_gladLoadProc) {
-            result = gladLoadGLLoader(g_gladLoadProc);
-        } else {
-            result = gladLoadGL();
+        if (!g_loader) {
+            std::cerr << "threepp::loadGlad: GL loader not set (call initGlad first)" << std::endl;
+            exit(EXIT_FAILURE);
         }
-        
-        if (!result) {
-            std::cerr << "Failed to initialize GLAD" << std::endl;
+        // glad2 GLES2 ローダ。GLADloadfunc は GLADapiproc(*)(const char*)。
+        if (!gladLoadGLES2(reinterpret_cast<GLADloadfunc>(g_loader))) {
+            std::cerr << "Failed to initialize GLAD (GLES2)" << std::endl;
             exit(EXIT_FAILURE);
         }
         gladInitialized = true;

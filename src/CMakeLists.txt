@@ -721,7 +721,7 @@ if (NOT DEFINED EMSCRIPTEN)
             "threepp/utils/LoadGlad.hpp"
     )
     list(APPEND sources
-            "external/glad/glad.c"
+            "external/glad/gles2.c"
             "threepp/utils/LoadGlad.cpp"
     )
 endif ()
@@ -783,6 +783,13 @@ if (NOT DEFINED EMSCRIPTEN)
             PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/external/glad"
     )
+
+    # glad を glad2 の GLES ローダ (gles2.c) に置き換えた。
+    #  - GLAD_NO_STANDALONE_LOADER: gles2.c が libGLESv2 を自前 dlopen する
+    #    スタンドアロンローダを無効化 (ホスト提供の getProcAddress のみ使う)。
+    #  - THREEPP_GLES: threepp 内のデスクトップ GL 専用パス (glGetTexImage 読み戻し,
+    #    glEnable(GL_MULTISAMPLE) 等) を GLES 相当へ切り替えるソースガード。
+    target_compile_definitions(threepp PRIVATE GLAD_NO_STANDALONE_LOADER THREEPP_GLES)
 
     if (THREEPP_WITH_SDL3)
         target_link_libraries(threepp PRIVATE SDL3::SDL3)
