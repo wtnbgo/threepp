@@ -60,6 +60,14 @@ namespace threepp {
     public:
         std::optional<GLTFResult> load(const std::filesystem::path& path);
 
+        /// Load from an in-memory glTF/GLB byte buffer (no filesystem access).
+        /// GLB (magic "glTF", e.g. .vrm) is self-contained and loads fully.
+        /// For plain .gltf JSON with external buffers/images, pass @p basePath so
+        /// relative URIs resolve; leave it empty when the asset is self-contained
+        /// (GLB or data:-URI embedded). Enables loading from host streams/archives.
+        std::optional<GLTFResult> load(const unsigned char* data, std::size_t size,
+                                       const std::filesystem::path& basePath = {});
+
     private:
         struct Impl;
     };

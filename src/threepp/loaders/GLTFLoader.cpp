@@ -1680,35 +1680,44 @@ namespace threepp {
     //  GLTFLoader public API
     // ===========================================================================
 
+    namespace {
+        // Parse an in-memory glTF/GLB byte buffer. Shared by both load() overloads.
+        // GLB is detected by magic ("glTF") so binary containers with non-standard
+        // extensions (e.g. .vrm) load correctly; otherwise treated as plain JSON.
+        GLTFResult parseGLTFBytes(const std::vector<uint8_t>& data, const fs::path& basePath) {
+            GLTFParser parser;
+            parser.basePath = basePath;
+            parser.buffers = {};
+
+            if (data.size() >= 4 && data[0] == 'g' && data[1] == 'l' && data[2] == 'T' && data[3] == 'F') {
+                return parser.parseGLB(data);
+            }
+            // plain JSON (.gltf)
+            std::string jsonText(data.begin(), data.end());
+            return parser.parseGLTF(jsonText);
+        }
+    }// namespace
+
     std::optional<GLTFResult> GLTFLoader::load(const fs::path& path) {
         try {
             std::ifstream f(path, std::ios::binary);
             if (!f) throw std::runtime_error("Cannot open file: " + path.string());
             std::vector<uint8_t> data(std::istreambuf_iterator<char>(f), {});
-
-            GLTFParser parser;
-            parser.basePath = path.parent_path();
-            parser.buffers = {};
-
-            // Detect GLB by magic ("glTF") rather than by extension, so binary
-            // containers with non-standard extensions (e.g. .vrm) load correctly.
-            if (data.size() >= 4 && data[0] == 'g' && data[1] == 'l' && data[2] == 'T' && data[3] == 'F') {
-                return parser.parseGLB(data);
-            }
-
-            std::string ext = path.extension().string();
-            // lowercase extension
-            for (auto& c : ext) c = static_cast<char>(std::tolower(c));
-
-            if (ext == ".glb") {
-                return parser.parseGLB(data);
-            }
-
-            // plain JSON (.gltf)
-            std::string jsonText(data.begin(), data.end());
-            return parser.parseGLTF(jsonText);
+            return parseGLTFBytes(data, path.parent_path());
         } catch (const std::exception& e) {
             std::cerr << "[GLTFLoader] Error loading " << path << ": " << e.what() << "\n";
+            return std::nullopt;
+        }
+    }
+
+    std::optional<GLTFResult> GLTFLoader::load(const unsigned char* data, std::size_t size,
+                                               const fs::path& basePath) {
+        try {
+            if (!data || size == 0) throw std::runtime_error("Empty glTF/GLB buffer");
+            std::vector<uint8_t> buf(data, data + size);
+            return parseGLTFBytes(buf, basePath);
+        } catch (const std::exception& e) {
+            std::cerr << "[GLTFLoader] Error loading from memory: " << e.what() << "\n";
             return std::nullopt;
         }
     }
