@@ -15,6 +15,7 @@ namespace threepp {
                           public MaterialWithLights,
                           public MaterialWithWireframe,
                           public MaterialWithLineWidth,
+                          public MaterialWithMorphTargets,
                           public MaterialWithEnvMap,
                           public MaterialWithDefines {
 
