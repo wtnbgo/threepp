@@ -151,6 +151,16 @@ namespace threepp {
         // ホストが capture 用 FBO を bind した状態で呼ぶ (例: onBeginScene の先頭)。
         void setDefaultFramebufferToCurrent();
 
+        // MSAA アンチエイリアス。ホストが単一サンプルの捕捉 FBO しか用意しない構成
+        // (吉里吉里 GLESAdaptor 等) 向け。sampleCount>1 のとき beginFrame() が内部の
+        // マルチサンプル FBO を bind してそこへ描き、endFrame() でホスト FBO へ resolve
+        // (blit) する。sampleCount<=1 なら従来どおりホスト FBO へ直接描く。
+        // 使い方: 描画コールバック内で beginFrame(w,h) → resetState/render → endFrame()。
+        void setSampleCount(int samples);
+        [[nodiscard]] int sampleCount() const;
+        void beginFrame(int width, int height);
+        void endFrame();
+
         [[nodiscard]] const gl::GLInfo& info() const;
 
         void writeFramebuffer(const std::filesystem::path& filename) override;

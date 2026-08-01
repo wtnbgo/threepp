@@ -107,6 +107,14 @@ struct GLRenderer::Impl {
     // ホスト提供の中間 FBO 上へ描く構成ではその ID を設定する。
     unsigned int _defaultFramebuffer = 0;
 
+    // MSAA (beginFrame/endFrame 用)。ホストが単一サンプルの捕捉 FBO しか用意しない
+    // 構成向けに、内部マルチサンプル FBO へ描いて resolve(blit)する。
+    int _frameSamples = 4;// 0/1 で無効
+    unsigned int _msaaFbo = 0, _msaaColorRb = 0, _msaaDepthRb = 0;
+    int _msaaWidth = 0, _msaaHeight = 0, _msaaSamples = 0;
+    unsigned int _hostFramebuffer = 0;// resolve 先 (beginFrame 時に bind されていた FBO)
+    bool _msaaActive = false;
+
     Camera* _currentCamera = nullptr;
     Vector4 _currentViewport;
     Vector4 _currentScissor;
@@ -1704,6 +1712,85 @@ void GLRenderer::setDefaultFramebufferToCurrent() {
     GLint fb = 0;
     glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fb);
     pimpl_->_defaultFramebuffer = static_cast<unsigned int>(fb);
+}
+
+void GLRenderer::setSampleCount(int samples) {
+
+    pimpl_->_frameSamples = samples;
+}
+
+int GLRenderer::sampleCount() const {
+
+    return pimpl_->_frameSamples;
+}
+
+void GLRenderer::beginFrame(int width, int height) {
+
+    auto& p = *pimpl_;
+
+    // 現在 bind されている FBO (ホストの捕捉先) を覚える
+    GLint hostFb = 0;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &hostFb);
+    p._hostFramebuffer = static_cast<unsigned int>(hostFb);
+
+    int samples = p._frameSamples;
+    if (samples > 1) {
+        GLint maxSamples = 1;
+        glGetIntegerv(GL_MAX_SAMPLES, &maxSamples);
+        if (samples > maxSamples) samples = maxSamples;
+    }
+
+    if (samples <= 1 || width <= 0 || height <= 0) {
+        // MSAA 無効: ホスト FBO へ直接描く
+        p._msaaActive = false;
+        p._defaultFramebuffer = p._hostFramebuffer;
+        return;
+    }
+
+    // 内部マルチサンプル FBO を (再)生成
+    if (p._msaaFbo == 0 || p._msaaWidth != width || p._msaaHeight != height || p._msaaSamples != samples) {
+        if (p._msaaColorRb) glDeleteRenderbuffers(1, &p._msaaColorRb);
+        if (p._msaaDepthRb) glDeleteRenderbuffers(1, &p._msaaDepthRb);
+        if (p._msaaFbo) glDeleteFramebuffers(1, &p._msaaFbo);
+
+        glGenFramebuffers(1, &p._msaaFbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, p._msaaFbo);
+
+        glGenRenderbuffers(1, &p._msaaColorRb);
+        glBindRenderbuffer(GL_RENDERBUFFER, p._msaaColorRb);
+        glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_RGBA8, width, height);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, p._msaaColorRb);
+
+        glGenRenderbuffers(1, &p._msaaDepthRb);
+        glBindRenderbuffer(GL_RENDERBUFFER, p._msaaDepthRb);
+        glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_DEPTH24_STENCIL8, width, height);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, p._msaaDepthRb);
+
+        glBindRenderbuffer(GL_RENDERBUFFER, 0);
+        p._msaaWidth = width;
+        p._msaaHeight = height;
+        p._msaaSamples = samples;
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, p._msaaFbo);
+    p._defaultFramebuffer = p._msaaFbo;// render() は画面ターゲット時ここへ描く
+    p._msaaActive = true;
+}
+
+void GLRenderer::endFrame() {
+
+    auto& p = *pimpl_;
+    if (!p._msaaActive || p._msaaFbo == 0) return;
+
+    // マルチサンプル FBO → ホスト FBO へ resolve (blit)
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, p._msaaFbo);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, p._hostFramebuffer);
+    glBlitFramebuffer(0, 0, p._msaaWidth, p._msaaHeight,
+                      0, 0, p._msaaWidth, p._msaaHeight,
+                      GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    glBindFramebuffer(GL_FRAMEBUFFER, p._hostFramebuffer);
+    p._defaultFramebuffer = p._hostFramebuffer;
+    p._msaaActive = false;
 }
 
 const gl::GLInfo& GLRenderer::info() const {
