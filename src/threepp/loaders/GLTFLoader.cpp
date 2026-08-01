@@ -981,6 +981,15 @@ namespace threepp {
                     if (auto* childMesh = child->as<Mesh>()) {
                         if (auto* clonedMesh = cloned->as<Mesh>()) {
                             clonedMesh->morphTargetInfluences() = childMesh->morphTargetInfluences();
+                            // meshPrimitives は原本(mesh)を指しているが、実際にシーンへ入るのは
+                            // この cloned。原本のままだと後段(VRM MToon 等)の setMaterial/morph
+                            // 設定が反映されないため、cloned で上書きする。
+                            for (auto& [key, m] : meshPrimitives) {
+                                if (m.get() == childMesh) {
+                                    m = std::dynamic_pointer_cast<Mesh>(cloned);
+                                    break;
+                                }
+                            }
                         }
                     }
                     return cloned;
