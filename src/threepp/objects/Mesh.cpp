@@ -88,7 +88,12 @@ namespace {
                             Vector3 _tempB;
                             Vector3 _tempC;
 
-                            for (unsigned i = 0, il = morphPosition->size(); i < il; i++) {
+                            // morphInfluences と morphPosition の要素数が食い違う場合に
+                            // 備えて短い方に合わせる（OOB アクセス回避）。
+                            const unsigned il = std::min<unsigned>(
+                                    static_cast<unsigned>(morphPosition->size()),
+                                    static_cast<unsigned>(morphInfluences.size()));
+                            for (unsigned i = 0; i < il; i++) {
 
                                 float influence = morphInfluences[i];
 

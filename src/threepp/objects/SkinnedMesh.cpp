@@ -87,11 +87,24 @@ void SkinnedMesh::updateMatrixWorld(bool force) {
 
 void SkinnedMesh::boneTransform(size_t index, Vector3& target) {
 
-    geometry_->getAttribute<int>("skinIndex")->setFromBufferAttribute(_skinIndex, index);
-    geometry_->getAttribute<float>("skinWeight")->setFromBufferAttribute(_skinWeight, index);
+    // 必要な属性/スケルトンが揃っていない場合はスキニングを諦め、
+    // バインドポーズの位置をそのまま返す（raycast 等でのクラッシュ回避）。
+    auto skinIndexAttr = geometry_->getAttribute<int>("skinIndex");
+    auto skinWeightAttr = geometry_->getAttribute<float>("skinWeight");
+    auto positionAttr = geometry_->getAttribute<float>("position");
+    if (!positionAttr) return;
+    if (!skinIndexAttr || !skinWeightAttr || !skeleton) {
+        positionAttr->setFromBufferAttribute(target, index);
+        return;
+    }
 
-    geometry_->getAttribute<float>("position")->setFromBufferAttribute(_basePosition, index);
+    skinIndexAttr->setFromBufferAttribute(_skinIndex, index);
+    skinWeightAttr->setFromBufferAttribute(_skinWeight, index);
+
+    positionAttr->setFromBufferAttribute(_basePosition, index);
     _basePosition.applyMatrix4(this->bindMatrix);
+
+    const size_t boneCount = skeleton->bones.size();
 
     target.set(0, 0, 0);
 
@@ -102,6 +115,7 @@ void SkinnedMesh::boneTransform(size_t index, Vector3& target) {
         if (weight != 0) {
 
             auto boneIndex = static_cast<int>(_skinIndex[i]);
+            if (boneIndex < 0 || static_cast<size_t>(boneIndex) >= boneCount) continue;
 
             _matrix.multiplyMatrices(*skeleton->bones[boneIndex]->matrixWorld, skeleton->boneInverses[boneIndex]);
 
