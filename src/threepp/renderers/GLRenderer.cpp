@@ -433,7 +433,7 @@ struct GLRenderer::Impl {
 
         if (auto m = material->as<MaterialWithMorphTargets>()) {
             if (m->morphTargets || m->morphNormals) {
-                morphTargets.update(object, geometry, material, program);
+                morphTargets.update(object, geometry, material, program, &textures);
             }
         }
 

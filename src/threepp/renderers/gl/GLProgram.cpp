@@ -33,6 +33,18 @@ namespace {
         glShaderSource(shader, 1, &str, nullptr);
         glCompileShader(shader);
 
+        // コンパイル失敗は従来ここで黙殺され、無効プログラム→描画破綻として現れていた。
+        // (リンクエラーだけ後段で報告されていた。) 失敗時はログを出して原因を可視化する。
+        GLint ok = 0;
+        glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
+        if (!ok) {
+            GLint len = 0;
+            glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &len);
+            std::string msg(len > 0 ? static_cast<size_t>(len) : 1, '\0');
+            glGetShaderInfoLog(shader, len, nullptr, &msg[0]);
+            std::cerr << "[Shader compile error] " << msg << std::endl;
+        }
+
         return shader;
     }
 
@@ -453,6 +465,8 @@ GLProgram::GLProgram(const GLRenderer* renderer, std::string cacheKey, const Pro
 
                     parameters->morphTargets ? "#define USE_MORPHTARGETS" : "",
                     parameters->morphNormals && !parameters->flatShading ? "#define USE_MORPHNORMALS" : "",
+                    parameters->morphTargets ? ("#define MORPHTARGETS_COUNT " + std::to_string(parameters->morphTargetsCount)) : "",
+                    parameters->morphTargets ? ("#define MORPHTARGETS_STRIDE " + std::to_string(parameters->morphNormals ? 2 : 1)) : "",
                     parameters->doubleSided ? "#define DOUBLE_SIDED" : "",
                     parameters->flipSided ? "#define FLIP_SIDED" : "",
 
@@ -503,30 +517,9 @@ GLProgram::GLProgram(const GLRenderer* renderer, std::string cacheKey, const Pro
 
                     "#endif",
 
-                    "#ifdef USE_MORPHTARGETS",
-
-                    "	attribute vec3 morphTarget0;",
-                    "	attribute vec3 morphTarget1;",
-                    "	attribute vec3 morphTarget2;",
-                    "	attribute vec3 morphTarget3;",
-
-                    "	#ifdef USE_MORPHNORMALS",
-
-                    "		attribute vec3 morphNormal0;",
-                    "		attribute vec3 morphNormal1;",
-                    "		attribute vec3 morphNormal2;",
-                    "		attribute vec3 morphNormal3;",
-
-                    "	#else",
-
-                    "		attribute vec3 morphTarget4;",
-                    "		attribute vec3 morphTarget5;",
-                    "		attribute vec3 morphTarget6;",
-                    "		attribute vec3 morphTarget7;",
-
-                    "	#endif",
-
-                    "#endif",
+                    // モーフはテクスチャ方式 (morphtarget_pars_vertex.glsl の
+                    // sampler2D morphTargetsTexture + texelFetch) へ移行したため、
+                    // morphTarget0..7 / morphNormal0..3 の頂点 attribute は不要。
 
                     "#ifdef USE_SKINNING",
 

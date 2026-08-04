@@ -97,6 +97,7 @@ namespace threepp {
 
             bool morphTargets{};
             bool morphNormals{};
+            int morphTargetsCount{};// ジオメトリのモーフ数 (テクスチャ方式のシェーダ #define 用)
 
             size_t numDirLights{};
             size_t numPointLights{};

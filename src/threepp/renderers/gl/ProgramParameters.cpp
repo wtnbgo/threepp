@@ -4,9 +4,11 @@
 #include "threepp/renderers/Renderer.hpp"
 #include "threepp/renderers/shaders/ShaderLib.hpp"
 
+#include "threepp/core/BufferGeometry.hpp"
 #include "threepp/materials/RawShaderMaterial.hpp"
 #include "threepp/materials/MeshStandardMaterial.hpp"
 #include "threepp/objects/InstancedMesh.hpp"
+#include "threepp/objects/Mesh.hpp"
 #include "threepp/objects/SkinnedMesh.hpp"
 #include "threepp/scenes/Scene.hpp"
 
@@ -174,6 +176,15 @@ ProgramParameters::ProgramParameters(
     if (auto m = material->as<MaterialWithMorphTargets>()) {
         morphTargets = m->morphTargets;
         morphNormals = m->morphNormals;
+        if (morphTargets) {
+            if (auto mesh = dynamic_cast<Mesh*>(object)) {
+                if (auto geom = mesh->geometry()) {
+                    if (auto morphPos = geom->getMorphAttribute("position")) {
+                        morphTargetsCount = static_cast<int>(morphPos->size());
+                    }
+                }
+            }
+        }
     }
 
     numDirLights = lights.directional.size();
@@ -277,6 +288,7 @@ std::string ProgramParameters::hash() const {
 
     s << std::to_string(morphTargets) << '\n';
     s << std::to_string(morphNormals) << '\n';
+    s << std::to_string(morphTargetsCount) << '\n';
 
     s << std::to_string(skinning) << '\n';
     s << std::to_string(useVertexTexture) << '\n';
