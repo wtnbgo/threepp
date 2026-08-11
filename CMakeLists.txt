@@ -16,6 +16,7 @@ option(THREEPP_WITH_USD "Build with USDLoader (tinyusdz)" OFF)
 option(THREEPP_WITH_RLTOOLS "Fetch RLtools (header-only deep RL) for the reinforcement-learning example" OFF)
 
 option(THREEPP_TREAT_WARNINGS_AS_ERRORS "Treat warnings as errors" OFF)
+option(THREEPP_INSTALL "Generate install rules. Parent projects embedding threepp via add_subdirectory can set this to OFF to keep threepp artifacts out of their install tree." ON)
 option(THREEPP_WITH_WGPU "Build with WebGPU backend (via wgpu-native)" OFF)
 option(THREEPP_WITH_VULKAN "Build with Vulkan backend (requires Vulkan SDK)" OFF)
 cmake_dependent_option(THREEPP_WGPU_GLSL_COMPAT
@@ -132,6 +133,8 @@ endif ()
 # Exports and remaining installation
 # ==============================================================================
 
+if (THREEPP_INSTALL)
+
 configure_package_config_file(cmake/config.cmake.in
         "${CMAKE_CURRENT_BINARY_DIR}/threepp-config.cmake"
         INSTALL_DESTINATION "${CMAKE_INSTALL_DATADIR}/threepp"
@@ -165,3 +168,5 @@ install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 install(EXPORT threepp-targets
         NAMESPACE threepp::
         DESTINATION "${CMAKE_INSTALL_DATADIR}/threepp")
+
+endif () # THREEPP_INSTALL
