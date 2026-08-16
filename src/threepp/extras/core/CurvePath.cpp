@@ -7,9 +7,6 @@
 
 using namespace threepp;
 
-template class threepp::CurvePath<Vector2>;
-template class threepp::CurvePath<Vector3>;
-
 template<class T>
 void CurvePath<T>::add(const std::shared_ptr<Curve<T>>& curve) {
 
@@ -164,3 +161,10 @@ std::vector<T> CurvePath<T>::getPoints(unsigned int divisions) const {
 
     return points;
 }
+
+// 明示的インスタンス化はメンバ定義より **後** に置くこと。
+// 明示的インスタンス化定義は、その時点で可視な定義しか実体化しない
+// (MSVC / GCC は翻訳単位末尾でまとめて実体化するので通ってしまうが、
+//  Clang は規格どおりなので前に置くと closePath 等が未定義シンボルになる)。
+template class threepp::CurvePath<Vector2>;
+template class threepp::CurvePath<Vector3>;
