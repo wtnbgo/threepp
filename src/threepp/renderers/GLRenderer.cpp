@@ -111,6 +111,9 @@ struct GLRenderer::Impl {
     // 構成向けに、内部マルチサンプル FBO へ描いて resolve(blit)する。
     int _frameSamples = 4;// 0/1 で無効
     unsigned int _msaaFbo = 0, _msaaColorRb = 0, _msaaDepthRb = 0;
+    // MSAA の resolve 用の中間 (単一サンプル RGBA8)。GLES ではマルチサンプルからの blit は
+    // 写し元と写し先の形式が一致している必要があり、ホストの捕捉先 (BGRA テクスチャ等) へ直接は写せない
+    unsigned int _resolveFbo = 0, _resolveColorRb = 0;
     int _msaaWidth = 0, _msaaHeight = 0, _msaaSamples = 0;
     unsigned int _hostFramebuffer = 0;// resolve 先 (beginFrame 時に bind されていた FBO)
     bool _msaaActive = false;
@@ -1752,6 +1755,8 @@ void GLRenderer::beginFrame(int width, int height) {
         if (p._msaaColorRb) glDeleteRenderbuffers(1, &p._msaaColorRb);
         if (p._msaaDepthRb) glDeleteRenderbuffers(1, &p._msaaDepthRb);
         if (p._msaaFbo) glDeleteFramebuffers(1, &p._msaaFbo);
+        if (p._resolveColorRb) glDeleteRenderbuffers(1, &p._resolveColorRb);
+        if (p._resolveFbo) glDeleteFramebuffers(1, &p._resolveFbo);
 
         glGenFramebuffers(1, &p._msaaFbo);
         glBindFramebuffer(GL_FRAMEBUFFER, p._msaaFbo);
@@ -1765,6 +1770,15 @@ void GLRenderer::beginFrame(int width, int height) {
         glBindRenderbuffer(GL_RENDERBUFFER, p._msaaDepthRb);
         glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_DEPTH24_STENCIL8, width, height);
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, p._msaaDepthRb);
+
+        // resolve 用の中間 (MSAA と同じ RGBA8・単一サンプル)
+        glGenFramebuffers(1, &p._resolveFbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, p._resolveFbo);
+        glGenRenderbuffers(1, &p._resolveColorRb);
+        glBindRenderbuffer(GL_RENDERBUFFER, p._resolveColorRb);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, width, height);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, p._resolveColorRb);
+        glBindFramebuffer(GL_FRAMEBUFFER, p._msaaFbo);
 
         glBindRenderbuffer(GL_RENDERBUFFER, 0);
         p._msaaWidth = width;
@@ -1786,8 +1800,17 @@ void GLRenderer::endFrame() {
     auto& p = *pimpl_;
     if (!p._msaaActive || p._msaaFbo == 0) return;
 
-    // マルチサンプル FBO → ホスト FBO へ resolve (blit)
+    // マルチサンプル FBO → ホスト FBO へ resolve (blit)。
+    // GLES ではマルチサンプルからの blit は写し元と写し先の形式が同じでないと
+    // GL_INVALID_OPERATION になる (ANGLE は通すが Mesa など素の GLES は通さない)。
+    // ホストの捕捉先は BGRA のテクスチャのことがあるので、いったん同じ RGBA8 の
+    // 単一サンプルへ resolve し、そこから (形式変換が許される) 単一サンプル同士で写す。
     glBindFramebuffer(GL_READ_FRAMEBUFFER, p._msaaFbo);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, p._resolveFbo);
+    glBlitFramebuffer(0, 0, p._msaaWidth, p._msaaHeight,
+                      0, 0, p._msaaWidth, p._msaaHeight,
+                      GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, p._resolveFbo);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, p._hostFramebuffer);
     glBlitFramebuffer(0, 0, p._msaaWidth, p._msaaHeight,
                       0, 0, p._msaaWidth, p._msaaHeight,
